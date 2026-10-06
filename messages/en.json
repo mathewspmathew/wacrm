@@ -1730,6 +1730,11 @@
       "currentPasswordIncorrect": "Current password is incorrect",
       "passwordUpdateFailed": "Password update failed: {message}",
       "passwordUpdated": "Password updated",
+      "recoveryModeNotice": "You signed in via a password recovery link. You can set a new password without entering your current password.",
+      "forgotPassword": "Forgot password?",
+      "sendingResetLink": "Sending reset link…",
+      "resetLinkSent": "Password reset email sent to {email}. Check your inbox.",
+      "sendResetLinkFailed": "Failed to send reset link: {message}",
       
       "sessionsTitle": "Active sessions",
       "sessionsDesc": "Sign out of every device where you're logged in — including this one. Useful if you lost a laptop or shared your password.",

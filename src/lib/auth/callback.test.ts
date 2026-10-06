@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   DEFAULT_NEXT_PATH,
   isEmailOtpType,
+  isRecoverySession,
   loginFailurePath,
   parseEmailLink,
   parseSupabaseError,
@@ -159,3 +160,34 @@ describe('relativeRedirect', () => {
     expect(res.headers.get('location')).not.toMatch(/^https?:/);
   });
 });
+
+describe('isRecoverySession', () => {
+  function makeToken(payload: Record<string, unknown>): string {
+    const header = Buffer.from(JSON.stringify({ alg: 'HS256', typ: 'JWT' })).toString('base64url');
+    const body = Buffer.from(JSON.stringify(payload)).toString('base64url');
+    return `${header}.${body}.signature`;
+  }
+
+  it('detects recovery when amr contains recovery object', () => {
+    const token = makeToken({ amr: [{ method: 'recovery', timestamp: 123456 }] });
+    expect(isRecoverySession({ access_token: token })).toBe(true);
+  });
+
+  it('detects recovery when amr contains recovery string', () => {
+    const token = makeToken({ amr: ['recovery'] });
+    expect(isRecoverySession({ access_token: token })).toBe(true);
+  });
+
+  it('returns false when amr has password or other methods', () => {
+    const token = makeToken({ amr: [{ method: 'password', timestamp: 123456 }] });
+    expect(isRecoverySession({ access_token: token })).toBe(false);
+  });
+
+  it('returns false when token is absent or invalid', () => {
+    expect(isRecoverySession(null)).toBe(false);
+    expect(isRecoverySession(undefined)).toBe(false);
+    expect(isRecoverySession({ access_token: '' })).toBe(false);
+    expect(isRecoverySession({ access_token: 'not-a-token' })).toBe(false);
+  });
+});
+

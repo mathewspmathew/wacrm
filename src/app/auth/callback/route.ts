@@ -31,6 +31,9 @@
 
 import { createClient } from '@/lib/supabase/server';
 import {
+  DEFAULT_NEXT_PATH,
+  RESET_PASSWORD_PATH,
+  isRecoverySession,
   loginFailurePath,
   parseEmailLink,
   parseSupabaseError,
@@ -43,7 +46,7 @@ export const dynamic = 'force-dynamic';
 
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
-  const next = safeNextPath(searchParams.get('next'));
+  const nextParam = searchParams.get('next');
 
   const upstreamError = parseSupabaseError(searchParams);
   if (upstreamError) {
@@ -56,7 +59,7 @@ export async function GET(request: Request) {
   }
 
   const supabase = await createClient();
-  const { error } =
+  const { data, error } =
     link.kind === 'code'
       ? await supabase.auth.exchangeCodeForSession(link.code)
       : await supabase.auth.verifyOtp({
@@ -75,6 +78,14 @@ export async function GET(request: Request) {
     });
     return relativeRedirect(loginFailurePath('link_invalid'));
   }
+
+  const isRecovery =
+    (link.kind === 'token_hash' && link.type === 'recovery') ||
+    searchParams.get('type') === 'recovery' ||
+    isRecoverySession(data?.session);
+
+  const fallback = isRecovery ? RESET_PASSWORD_PATH : DEFAULT_NEXT_PATH;
+  const next = safeNextPath(nextParam, fallback);
 
   return relativeRedirect(next);
 }

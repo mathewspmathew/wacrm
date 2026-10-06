@@ -13,6 +13,9 @@ import type { EmailOtpType } from '@supabase/supabase-js';
 /** Where a link lands when it carries no usable `next`. */
 export const DEFAULT_NEXT_PATH = '/dashboard';
 
+/** Where a password recovery flow lands when it carries no usable `next`. */
+export const RESET_PASSWORD_PATH = '/reset-password';
+
 /** Where a link that could not be exchanged for a session lands. */
 export const LOGIN_PATH = '/login';
 
@@ -143,3 +146,45 @@ export function relativeRedirect(location: string): Response {
     },
   });
 }
+
+/**
+ * Checks whether an access token or session was authenticated via password recovery.
+ * Decodes the JWT access token and inspects the Authentication Method References (AMR).
+ */
+export function isRecoverySession(
+  session: { access_token?: string } | null | undefined,
+): boolean {
+  if (!session?.access_token) return false;
+  try {
+    const parts = session.access_token.split('.');
+    if (parts.length < 2) return false;
+    const base64 = parts[1].replace(/-/g, '+').replace(/_/g, '/');
+    let json = '';
+    if (typeof atob === 'function') {
+      json = decodeURIComponent(
+        atob(base64)
+          .split('')
+          .map((c) => '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2))
+          .join(''),
+      );
+    } else if (typeof Buffer !== 'undefined') {
+      json = Buffer.from(base64, 'base64').toString('utf8');
+    }
+    if (!json) return false;
+    const payload = JSON.parse(json);
+    const amr = payload.amr;
+    if (Array.isArray(amr)) {
+      return amr.some((entry: unknown) => {
+        if (typeof entry === 'string') return entry === 'recovery';
+        if (entry && typeof entry === 'object' && entry !== null && 'method' in entry) {
+          return (entry as { method: string }).method === 'recovery';
+        }
+        return false;
+      });
+    }
+  } catch {
+    return false;
+  }
+  return false;
+}
+

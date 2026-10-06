@@ -45,13 +45,40 @@ export default function ResetPasswordPage() {
 
   useEffect(() => {
     let cancelled = false;
+    let timer: NodeJS.Timeout | null = null;
+
     // The callback wrote the session cookies server-side; the browser
-    // client reads them here. No user → the link didn't yield a session.
+    // client reads them here.
     supabase.auth.getUser().then(({ data: { user } }) => {
-      if (!cancelled) setStatus(user ? "ready" : "expired");
+      if (!cancelled) {
+        if (user) {
+          setStatus("ready");
+        } else {
+          // Allow a brief moment for client-side hash session initialization if arriving directly
+          timer = setTimeout(() => {
+            if (!cancelled) {
+              supabase.auth.getUser().then(({ data: { user: retryUser } }) => {
+                if (!cancelled) setStatus(retryUser ? "ready" : "expired");
+              });
+            }
+          }, 1000);
+        }
+      }
     });
+
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((event, session) => {
+      if (cancelled) return;
+      if (event === "PASSWORD_RECOVERY" || session?.user) {
+        setStatus("ready");
+      }
+    });
+
     return () => {
       cancelled = true;
+      if (timer) clearTimeout(timer);
+      subscription.unsubscribe();
     };
   }, [supabase]);
 

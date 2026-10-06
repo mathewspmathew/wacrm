@@ -59,6 +59,36 @@ describe('GET /auth/callback', () => {
     expect(res.headers.get('location')).toBe('/dashboard');
   });
 
+  it('defaults next to /reset-password for token_hash recovery links when next is absent', async () => {
+    const res = await GET(request('token_hash=th-1&type=recovery'));
+    expect(mocks.verifyOtp).toHaveBeenCalledWith({
+      type: 'recovery',
+      token_hash: 'th-1',
+    });
+    expect(res.headers.get('location')).toBe('/reset-password');
+  });
+
+  it('defaults next to /reset-password when query has type=recovery and next is absent', async () => {
+    const res = await GET(request('code=abc&type=recovery'));
+    expect(res.headers.get('location')).toBe('/reset-password');
+  });
+
+  it('defaults next to /reset-password when session AMR contains recovery', async () => {
+    const header = Buffer.from(JSON.stringify({ alg: 'HS256' })).toString('base64url');
+    const body = Buffer.from(
+      JSON.stringify({ amr: [{ method: 'recovery', timestamp: 1234 }] }),
+    ).toString('base64url');
+    const token = `${header}.${body}.sig`;
+
+    mocks.exchangeCodeForSession.mockResolvedValueOnce({
+      data: { session: { access_token: token } },
+      error: null,
+    });
+
+    const res = await GET(request('code=abc'));
+    expect(res.headers.get('location')).toBe('/reset-password');
+  });
+
   // `next` is attacker-controllable query input: the callback has just
   // minted a session and must not hand the browser to another origin.
   it('refuses an off-origin next and falls back to /dashboard', async () => {
